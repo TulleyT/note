@@ -1,0 +1,21 @@
+dubbo
+负载均衡：roundrobin 轮询 random 随机（默认） leastactive 最小链接 consistenthash 一致性hash 
+集群容错：failover 失败则尝试调用其他服务器 （默认）
+         failfast 失败立即报错
+         failsafe 失败忽略
+         failback 失败定时重试
+         forking 并行调用一批服务器，只要一个成功即为成功
+         broadcast 逐个调用 有一个报错则报错
+服务降级：mock机制 
+            1.mock null  mock=“return null”
+                有返回值的方法降级结果为null
+            2.class mock 
+                在业务所在包创建一个mock类： 简单类名 + Mock
+                实现目标接口 在方法中实现降级逻辑
+服务限流：
+        直接限流限制连接数
+            提供者端的executes属性，限制并发执行数
+            提供者端的accepts属性，限制消费者的最大连接
+            actives 两端均可
+            connections 两端均可 
+               actives， connections联合使用，后者限制长连接的数量 前者限制每个长连接的请求数

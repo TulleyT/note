@@ -1,0 +1,46 @@
+zookeeper leader选举机制
+A.初始化阶段 
+   1. 集群中每一个server 都给自己投一票，然后将投票信息发送给集群中的其他机器，每一个选票信息中包含（myid，zxid（高32位为epoch））此时每一个server 都处于Looking状态
+   2. 每一个server 收到其他server的投票信息后要判断是否为本轮的投票即epoch，判断是否为Looking状态的服务器（Observer没有选举权也没有被选举权）
+   3. zxid大的当leader，zxid相同的myid大的当leader
+   4. 非leader的server将自身的选票信息更新为leader的信息
+   5. 统计集群中是否有过半的server 接受了相同的投票信息 是则改变服务器状态
+   6. leader 更改为Leading 状态 follower更改为 Following状态
+   7. 否则发起新一轮投票
+   8. 如果选举结束有一台新主机加入则只能成为Follower
+
+初始化同步：
+    1.为了保证leader向learner发送提案有序，leader给每一个learner准备了一个队列
+    2.然后leader将没有被learner同步的事务封装成一个proposal
+    3.leader将每一个proposal发送给learner并且在每一个proposal后面都紧跟一个COMMIT命令，表示该事务已经被提交，learner可以直接接受并执行
+    4.learner接收到来自leader的proposal后将其更新到本地
+    5.更新成功会返回给leader一个ACK信息
+    6.leader收到了ACK后会将对应的节点加入到的可用的Follower列表中去，没有返回ack的或者返回了但是leader没有收到的节点则不会进入Follower列表
+    7.当集群中有过半的节点完成初始化同步以后，集群进入正常的工作模式
+
+B.断线重连
+   1.所有非Observer节点全部进入Looking状态
+   2.和初始化阶段相同
+
+消息广播：
+    1.leader将收到的事务请求封装成一个proposal并给该事务赋予一个全局唯一的zxid
+    2.leader将该proposal发送给列表中的每一个follower
+    3.follower收到proposal以后会将该proposal的zxid与本地保存的最新的zxid比较，如果当前接受的zxid大则将当前事务记录到本地事务日志中，并向leader返回一个ack
+    4.当leader收到超过半数的ack以后，就会向follower列表中的follower发送COMMIT命令，向所有的Observer发送proposal
+    5.当follower接收到commit命令收，将日志中的事务正式更新到本地，Observer收到proposal后会直接更新到本地
+
+watcher机制
+    1.client生成watcher对象
+    2.向服务器注册watcher
+    3.服务器出发watcher事件
+    4.向客户端响应
+    5.根据通知找到相应watcher对象
+    6.执行相应的回调
+
+分布式锁：临时顺序节点
+    1.client对xs_lock节点创建子节点变更的watcher监听
+    2.当client需要获得分布式锁的时候，向xs_lock节点下创建一个子节点 读请求为hostname-R-序号，写请求为hostname-W-序号
+    3.子节点创建完成后会比较自身和其他子节点的序号大小并根据读写的操作不同执行不同的逻辑
+        读：如果没有比自己小的节点，或者比自己小的节点全是读节点，则可以获得共享锁
+            如果比自己小的节点中有写节点则需要等待写操作完成
+        写：如果没有比自己小的节点，则获得排他锁，开始写数据，如果存在比自己小的节点则等待

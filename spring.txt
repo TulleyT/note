@@ -1,0 +1,49 @@
+入口 ：ApplicationContext ctx = new ClassPatnXmlApplicationContext("spring.xml");
+真正执行的方法: AbstractApplicatonContext的refresh();
+主要干几件事： 1.创建IoC容器，也就是DefaultListableBeanFactory 并对其设置一些公共属性 (加载配置文件，解析标签包装为BeanDefination)
+              2.调用BeanFactoryPostProcessor对BeanDefintion做后置处理 (PropertyPlaceholderConfigurer 替换${}占位符) 
+              3.注册BeanPostProcessor后置处理器
+              4.初始话消息源，初始化事件广播，初始化一些特殊bean 反正就各种初始化
+              5.finishBeanFactoryInitialization Bean实例化
+              6.完成刷新发布对应事件
+
+创建BeanFactory时：  1.销毁原有的IoC容器
+                    2.创建DefaultListableBeanFactory对象
+                    3.加载BeanDefination 并添加到beanDefinitionMap中
+
+Bean实例化：入口getBean() 实际为AbstractAutowireCapableBeanFactory doCreateBean()实现
+            1.调用无参构造器实例化bean
+            2.populateBean()填充属性
+            3.initializeBean()对bean初始化
+               ** invokeAwareMethods()判断Bean是否实现了下列接口 BeanNameAware、BeanClassLoaderAware、BeanFactoryAware 调用对应方法为bean设置相应属性
+                初始化前：applyBeanPostProcessorsBeforeInitialization()调用BeanPostProcessor做前置处理
+                初始化：如果bean实现了InitializingBean则先调用afterPropertiesSet（Dubbo的ServiceBean的服务器暴露就在此处）
+                        然后再调用init-method属性指定的初始化方法
+                初始化后：applyBeanPostProcessorsAfterInitialization()调用BeanPostProcessor做后置处理 （AOP代理对象的生成）
+
+                在容器进行关闭之前，如果该 bean 实现了 DisposableBean 接口，则调用 destroy() 方法。
+                在容器进行关闭之前，如果该 bean 配置了 destroy-mehod，则调用其指定的方法。
+
+循环依赖：Spring 在创建 bean 的时候并不是等它完全完成，而是在创建过程中将创建中的 bean 的 ObjectFactory 加入到 singletonFactories 缓存中，
+            这样一旦下一个 bean 创建的时候需要依赖 bean ，则直接使用 ObjectFactory 的 getObject() 获取了
+
+spring aop是通过动态代理实现的，一种是jdk的基于接口的实现，一种是cglib基于子类继承的实现
+aop的使用 @Aspect注解 @Component注解 @Pointcut切入点 @Before @AfterReturning 前后置处理
+使用@ControllerAdvice @ExceptionHandler实现controller层全局异常处理
+
+
+springMvc：
+        1.请求发送到DispatchServlet --> 调用HandlerMapping（Map） 根据uri 找到对应 Handler （K,V）生成处理器对象和拦截器（如果有的话）
+        2.DispatchServlet 通过HandlerAdapter调用处理器（为什么需要适配器：继承Controller方式所使用的适配器，SimpleControllerHandlerAdapter
+                                                        注解方式（@Controller）的处理器适配器：RequestMappingHandlerAdapter ）
+        3.HandlerAdapter调用handler方法
+        4.HandlerAdapter将返回的结果mov返回给DispatchServlet
+        5.DispatchServlet将mov发送给视图解析器ViewResolver
+        6.ViewResolver解析Mov 成为view对象
+        7.DispatchServlet渲染view对象
+        8返回结果
+
+        返回json对象：HttpMessageConverter实现，spring 默认使用jackson 如果需要使用fastJson 则需要自行实现一个fastJsonHttpMessageConverters， 具体的应用比如null字段不返回
+
+spring boot 自动化配置
+        

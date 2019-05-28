@@ -1,0 +1,10 @@
+nginx调优
+1.全局模块
+    worker_processes 一般设置成cpu内核的数值或者整数倍 不确定时可以设置为auto
+    worker_rlimit_nofile 65535 设置一个 worker 进程所能打开的最多文件数量。其默认值与当前 Linux 系统可以打 开的最大文件描述符数量相同。
+2.event模块
+     worker_connections 1024 每个worker的最大连接数 不超过worker_rlimit_nofile
+     accept_mutex on 区别空闲worker 如何分配新连接 默认是on 即空闲worker 串行化处理
+                  off 当新连接到达时所有空闲worker都被唤醒 只有一个能获得，其他的进入阻塞状态
+     accept_mutex_delay 500ms 如果上面的为on 则为队首的worker尝试获得新连接的时间间隔
+     
